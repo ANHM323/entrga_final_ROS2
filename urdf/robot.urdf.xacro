@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<robot name="dif_bot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Argumentos -->
+  <xacro:arg name="use_ros2_control" default="false"/>
+  <!-- true: el controlador publica odom->base_link en /tf. false: lo publica el EKF (P2+) -->
+  <xacro:arg name="publish_odom_tf" default="true"/>
+
+  <!-- 1. Geometría, colisiones e inercias -->
+  <xacro:include filename="robot_core.xacro"/>
+  <!-- 2. Sensores (links, TF y sensores de Gazebo) -->
+  <xacro:include filename="sensors.xacro"/>
+  <!-- 3. Fricción de las ruedas -->
+  <xacro:include filename="gz_physics.xacro"/>
+
+  <!-- 4. Sistema de control: uno u otro -->
+  <xacro:if value="$(arg use_ros2_control)">
+    <xacro:include filename="ros2_control.xacro"/>
+    <xacro:ros2_control_block/>
+  </xacro:if>
+  <xacro:unless value="$(arg use_ros2_control)">
+    <xacro:include filename="gz_control.xacro"/>
+  </xacro:unless>
+
+</robot>

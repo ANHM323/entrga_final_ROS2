@@ -1,0 +1,22 @@
+# P1 — modo use_ros2_control:=false  (2026-11-21T16:08:07-05:00)
+# robot en movimiento: v=0.3 m/s, w=0.2 rad/s
+
+## ros2 topic info /odom -v (publicador)
+Node name: ros_gz_bridge
+Node namespace: /
+Publisher count: 1
+
+## timeout 20 ros2 topic hz -s /odom
+average rate: 50.000
+	min: 0.020s max: 0.020s std dev: 0.00000s window: 901
+failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+
+## timeout 20 ros2 topic delay -s /odom
+	min: 0.000s max: 0.003s std dev: 0.00011s window: 895
+average delay: 0.000
+	min: 0.000s max: 0.003s std dev: 0.00010s window: 945
+
+## timeout 10 ros2 topic hz -s /tf
+average rate: 69.956
+	min: 0.000s max: 0.020s std dev: 0.00728s window: 631
+failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333

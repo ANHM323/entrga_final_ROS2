@@ -1,0 +1,15 @@
+# Waypoints de la misión, en el frame "map" (metros, yaw en radianes).
+# El origen del mapa es la pose inicial del robot al hacer SLAM.
+# AJUSTAR tras generar maps/mi_mapa: use "Publish Point" en RViz y lea /clicked_point.
+mision:
+  frame_id: map
+  loop: false               # true: repetir la secuencia
+  initial_pose:             # se envía a AMCL antes de empezar (null para omitir)
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+  waypoints:
+    - {name: P1, x: 3.0, y: 0.0, yaw: 0.0}
+    - {name: P2, x: 3.0, y: 2.0, yaw: 1.57}
+    - {name: P3, x: 0.0, y: 2.0, yaw: 3.14}
+    - {name: inicio, x: 0.0, y: 0.0, yaw: 0.0}

@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- Control con ros2_control + gz_ros2_control (use_ros2_control:=true) -->
+  <xacro:macro name="wheel_interfaces" params="name">
+    <joint name="${name}">
+      <command_interface name="velocity">
+        <param name="min">-10</param>
+        <param name="max">10</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="ros2_control_block">
+    <ros2_control name="GazeboSimSystem" type="system">
+      <hardware>
+        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+      </hardware>
+      <xacro:wheel_interfaces name="drivewhl_l_joint"/>
+      <xacro:wheel_interfaces name="drivewhl_r_joint"/>
+    </ros2_control>
+
+    <gazebo>
+      <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>$(find dif_bot)/config/controllers.yaml</parameters>
+        <ros>
+          <!-- Interfaz común con el modo Gazebo: /odom y /cmd_vel (vía relay) -->
+          <remapping>/diff_drive_controller/odom:=/odom</remapping>
+          <remapping>/diff_drive_controller/cmd_vel:=/cmd_vel_stamped</remapping>
+          <remapping>/diff_drive_controller/tf_odometry:=/tf</remapping>
+        </ros>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+</robot>

@@ -1,0 +1,24 @@
+# P1 — modo use_ros2_control:=true  (2026-11-21T16:09:27-05:00)
+# robot en movimiento: v=0.3 m/s, w=0.2 rad/s
+diff_drive_controller   diff_drive_controller/DiffDriveController      active
+joint_state_broadcaster joint_state_broadcaster/JointStateBroadcaster  active
+
+## ros2 topic info /odom -v (publicador)
+Node name: diff_drive_controller
+Node namespace: /
+Publisher count: 1
+
+## timeout 20 ros2 topic hz -s /odom
+	min: 0.019s max: 0.021s std dev: 0.00007s window: 751
+average rate: 50.000
+	min: 0.019s max: 0.021s std dev: 0.00007s window: 801
+
+## timeout 20 ros2 topic delay -s /odom
+	min: 0.000s max: 0.001s std dev: 0.00049s window: 890
+average delay: 0.000
+	min: 0.000s max: 0.001s std dev: 0.00049s window: 940
+
+## timeout 10 ros2 topic hz -s /tf
+	min: 0.000s max: 0.020s std dev: 0.00867s window: 534
+average rate: 66.667
+	min: 0.000s max: 0.020s std dev: 0.00866s window: 600
