@@ -96,5 +96,3 @@ Los waypoints están en `config/waypoints.yaml` (frame `map`). Ajústalos a tu m
 cd informe && pdflatex informe.tex && pdflatex informe.tex
 ```
 
-## Video
-Enlace: _pendiente_ (o `video/mision_demo.mp4`).
