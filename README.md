@@ -58,7 +58,9 @@ ros2 launch dif_bot ekf.launch.py
 ros2 launch dif_bot slam.launch.py
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ros2 run nav2_map_server map_saver_cli -f ~/ros2_ws/src/rbtc_proyecto_final/maps/mi_mapa
+cd ~/ros2_ws && colcon build --symlink-install   # para instalar el mapa nuevo
 ```
+El lidar tiene 25 m de alcance: con 10 m los pasillos largos del almacén no daban referencia al *scan matching*.
 
 ## Práctica 4 — AMCL
 ```bash
@@ -76,6 +78,9 @@ ros2 launch dif_bot navigation.launch.py       # config/nav2_params.yaml
 ```
 En RViz: *Nav2 Goal*.
 
+> Si el bringup de Nav2 aborta ("Aborting bringup", timeout de `controller_server`), reintentar:
+> `ros2 service call /lifecycle_manager_navigation/manage_nodes nav2_msgs/srv/ManageLifecycleNodes "{command: 0}"`
+
 ## Proyecto final — Misión autónoma
 ```bash
 ros2 launch dif_bot mision.launch.py           # Gazebo + EKF + Nav2 + RViz + nodo mision
@@ -85,4 +90,11 @@ ros2 topic echo /estado_mision
 ```
 Los waypoints están en `config/waypoints.yaml` (frame `map`). Ajústalos a tu mapa con *Publish Point* en RViz (`ros2 topic echo /clicked_point`).
 
-Video: `video/mision_demo.mp4` (o enlace).
+## Informe
+`informe/informe.pdf` (formato IEEE, fuente `informe/informe.tex`). Para recompilar:
+```bash
+cd informe && pdflatex informe.tex && pdflatex informe.tex
+```
+
+## Video
+Enlace: _pendiente_ (o `video/mision_demo.mp4`).

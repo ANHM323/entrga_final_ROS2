@@ -6,3 +6,8 @@ log/
 *.log
 frames_*.pdf
 frames_*.gv
+# LaTeX
+informe/*.aux
+informe/*.log
+informe/*.out
+informe/*.toc

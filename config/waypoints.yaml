@@ -1,15 +1,12 @@
-# Waypoints de la misión, en el frame "map" (metros, yaw en radianes).
-# El origen del mapa es la pose inicial del robot al hacer SLAM.
-# AJUSTAR tras generar maps/mi_mapa: use "Publish Point" en RViz y lea /clicked_point.
+# Waypoints de la misión (frame "map", metros, yaw en rad).
+# Generados sobre maps/mi_mapa: celdas libres con >0.7 m de holgura, alcanzables desde el origen.
+# El origen (0,0,0) es la pose de aparición del robot en el warehouse.
 mision:
   frame_id: map
-  loop: false               # true: repetir la secuencia
-  initial_pose:             # se envía a AMCL antes de empezar (null para omitir)
-    x: 0.0
-    y: 0.0
-    yaw: 0.0
+  loop: false
+  initial_pose: {x: 0.0, y: 0.0, yaw: 0.0}
   waypoints:
-    - {name: P1, x: 3.0, y: 0.0, yaw: 0.0}
-    - {name: P2, x: 3.0, y: 2.0, yaw: 1.57}
-    - {name: P3, x: 0.0, y: 2.0, yaw: 3.14}
-    - {name: inicio, x: 0.0, y: 0.0, yaw: 0.0}
+  - {name: P1, x: 11.93, y: -0.78, yaw: 2.4}
+  - {name: P2, x: -1.87, y: 11.87, yaw: -1.57}
+  - {name: P3, x: -1.87, y: -8.68, yaw: 1.36}
+  - {name: inicio, x: -0.02, y: 0.07, yaw: 0.0}

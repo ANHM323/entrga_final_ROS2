@@ -15,7 +15,7 @@ amcl:
     global_frame_id: map
     lambda_short: 0.1
     laser_likelihood_max_dist: 2.0
-    laser_max_range: 10.0
+    laser_max_range: 25.0
     laser_min_range: -1.0
     laser_model_type: likelihood_field
     max_beams: 60
@@ -45,7 +45,3 @@ amcl:
       y: 0.0
       z: 0.0
       yaw: 0.0
-map_server:
-  ros__parameters:
-    use_sim_time: true
-    yaml_filename: ''

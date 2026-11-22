@@ -1,0 +1,189 @@
+\documentclass[conference,a4paper]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla,es-noshorthands]{babel}
+\usepackage{cite,amsmath,graphicx,booktabs,tabularx,xcolor,listings,url}
+\usepackage[hidelinks]{hyperref}
+
+% ======== DATOS DE LA ENTREGA (EDITAR) ========
+\newcommand{\repo}{\url{https://github.com/USUARIO/rbtc_proyecto_final}}
+\newcommand{\video}{\url{https://ENLACE-AL-VIDEO}}
+% ==============================================
+
+\graphicspath{{../results/}{../docs/}{../maps/}}
+% \fig{archivo}{pie}{etiqueta} -- una columna; muestra un recuadro si falta
+\newcommand{\fig}[3]{%
+  \begin{figure}[!t]\centering
+  \IfFileExists{../results/#1}{\includegraphics[width=\linewidth]{#1}}{%
+  \IfFileExists{../docs/#1}{\includegraphics[width=\linewidth]{#1}}{%
+  \fbox{\parbox{.9\linewidth}{\centering\vspace{8mm}Falta: \texttt{\detokenize{#1}}\vspace{8mm}}}}}
+  \caption{#2}\label{#3}\end{figure}}
+
+\lstset{basicstyle=\ttfamily\scriptsize,breaklines=true,frame=single,
+  columns=fullflexible,keepspaces=true}
+
+\begin{document}
+
+\title{Navegación autónoma de un robot diferencial con ROS~2, Gazebo y Nav2}
+
+\author{
+\IEEEauthorblockN{Nombre Apellido 1, Nombre Apellido 2}
+\IEEEauthorblockA{Robótica Móvil Autónoma --- Proyecto final\\
+Escuela Colombiana de Ingeniería Julio Garavito, Bogotá, Colombia\\
+Profesor: Ing. Daniel Palomino Suárez, MSc.}
+}
+
+\maketitle
+
+\begin{abstract}
+Se implementa un pipeline completo de navegación autónoma para un robot diferencial simulado en ROS~2 Jazzy y Gazebo Sim (Harmonic): control y odometría con el plugin DiffDrive de Gazebo y con \texttt{ros2\_control}, fusión de odometría e IMU con un EKF (\texttt{robot\_localization}), mapeo con SLAM Toolbox, localización con AMCL y navegación con Nav2. Sobre esto, un nodo propio ejecuta misiones de waypoints mediante \texttt{nav2\_simple\_commander}, activadas por un servicio ROS. Ambos métodos de control publican odometría a 50\,Hz con retardo despreciable; el EKF sin IMU reproduce la odometría (0.005\,m de diferencia) porque en simulación no hay deslizamiento; el mapa del almacén se obtuvo a 5\,cm/celda y AMCL converge lateralmente en pocos metros, pero conserva ambigüedad longitudinal en pasillos largos.
+\end{abstract}
+
+\begin{IEEEkeywords}
+ROS~2, Gazebo, ros2\_control, EKF, SLAM, AMCL, Nav2, robot diferencial.
+\end{IEEEkeywords}
+
+%=====================================================================
+\section{Introducción}
+La navegación autónoma integra estimación de estado, mapeo, localización, planificación y control. Este trabajo construye cada etapa sobre el mismo robot y el mismo entorno, siguiendo las prácticas P1--P5 de la guía, y las une en una misión autónoma. El código, los parámetros y las evidencias están en el repositorio \repo; el video demostrativo está en \video.
+
+%=====================================================================
+\section{Robot y entorno}
+El robot \texttt{dif\_bot} es una base diferencial de $0.42\times0.31\times0.18$\,m y 15\,kg, con ruedas motrices de radio $r=0.10$\,m separadas $L=0.36$\,m y una rueda loca. Sensores: IMU a 50\,Hz, lidar 2D de 360 muestras (0.12--25\,m, 10\,Hz, ruido gaussiano $\sigma=1$\,cm) y cámara de profundidad. El entorno es el \emph{warehouse} de \texttt{nav2\_minimal\_tb4\_sim}. La Tabla~\ref{tab:archivos} resume los archivos principales.
+
+\begin{table}[!t]\centering\footnotesize
+\caption{Archivos principales del paquete \texttt{dif\_bot}}\label{tab:archivos}
+\begin{tabularx}{\columnwidth}{lX}\toprule
+Archivo & Función \\\midrule
+\texttt{urdf/robot.urdf.xacro} & Modelo; condicional \texttt{use\_ros2\_control} \\
+\texttt{launch/sim.launch.py} & Gazebo, \texttt{robot\_state\_publisher}, puente \\
+\texttt{config/ekf.yaml} & EKF 2D (odometría + IMU) \\
+\texttt{config/slam\_params.yaml} & SLAM Toolbox (online async) \\
+\texttt{config/amcl.yaml} & AMCL \\
+\texttt{config/nav2\_params.yaml} & Planner, controller, BT, costmaps \\
+\texttt{scripts/mision.py} & Nodo de misión (\texttt{/iniciar\_mision}) \\
+\texttt{config/waypoints.yaml} & Waypoints de la misión \\\bottomrule
+\end{tabularx}
+\end{table}
+
+%=====================================================================
+\section{P1: Control y odometría}
+\subsection{Estructura del URDF}
+Las ruedas \texttt{drivewhl\_l/r\_joint} son \emph{continuous} hijas de \texttt{base\_link}; la rueda loca, \texttt{base\_footprint} ($z=-0.15$\,m), \texttt{imu\_link}, \texttt{lidar\_link} ($z=0.12$\,m) y \texttt{camera\_link} ($x=0.20$\,m) son \emph{fixed}.
+
+\subsection{Comparación de los métodos de control}
+Con \texttt{use\_ros2\_control:=false} el plugin DiffDrive de Gazebo integra la velocidad de las ruedas en el simulador y \texttt{ros\_gz\_bridge} lleva \texttt{/odom} y la TF a ROS. Con \texttt{use\_ros2\_control:=true}, \texttt{gz\_ros2\_control} expone interfaces de velocidad y el \texttt{diff\_drive\_controller} calcula la odometría dentro de ROS. La Tabla~\ref{tab:p1} muestra las mediciones con \texttt{ros2 topic hz/delay -s} y el robot en movimiento.
+
+\begin{table}[!t]\centering\footnotesize
+\caption{Comparación de los dos métodos de control}\label{tab:p1}
+\begin{tabularx}{\columnwidth}{lXX}\toprule
+ & DiffDrive (Gazebo) & \texttt{ros2\_control} \\\midrule
+Publica \texttt{/odom} & \texttt{ros\_gz\_bridge} & \texttt{diff\_drive\_controller} \\
+TF \texttt{odom$\to$base\_link} & plugin & controlador \\
+\texttt{joint\_states} & JointStatePublisher & \texttt{joint\_state\_broadcaster} \\
+Frecuencia & 50.000\,Hz, $\sigma{=}0$ & 50.000\,Hz, $\sigma{=}70\,\mu$s \\
+Retardo & $\approx0$ (máx. 3\,ms) & $\approx0$ (máx. 1\,ms) \\\bottomrule
+\end{tabularx}
+\end{table}
+
+Ambos son estables y de latencia despreciable en tiempo de simulación. \texttt{ros2\_control} añade un jitter mínimo y limita velocidad y aceleración, lo que suaviza el movimiento. Es el más adecuado para un robot real, porque el mismo controlador funciona cambiando solo la interfaz de hardware; el plugin de Gazebo solo existe en simulación.
+
+%=====================================================================
+\section{P2: Fusión sensorial}
+El EKF 2D fusiona $v_x$, $v_y$ (restricción no holonómica $v_y=0$) y $\omega_z$ de la odometría de ruedas con $\omega_z$ y $a_x$ de la IMU, a 30\,Hz. Publica \texttt{/odom\_filtered} y es el único emisor de la TF \texttt{odom$\to$base\_link} (el simulador se lanza con \texttt{publish\_odom\_tf:=false}); el árbol TF resultante está en \texttt{docs/tf\_frames.pdf}.
+
+Para comparar, el robot recorrió un cuadrado de 2\,m en lazo abierto (Tabla~\ref{tab:p2}, Fig.~\ref{fig:p2}). Sin IMU, el filtro integra solo la odometría y coincide con ella. Con IMU, el ruido del giroscopio agrega $\approx0.03$\,rad de error por giro, porque en simulación las ruedas no patinan y la odometría ya es casi perfecta. En un robot real ocurre lo contrario: el deslizamiento hace que la IMU corrija el yaw. Las covarianzas determinan cuánto se confía en cada fuente.
+
+\begin{table}[!t]\centering\footnotesize
+\caption{Pose final $(x,y,\psi)$ tras el cuadrado de 2\,m}\label{tab:p2}\setlength{\tabcolsep}{3pt}\scriptsize
+\begin{tabular}{lccc}\toprule
+Caso & \texttt{/odom} & \texttt{/odom\_filtered} & $\Delta$ \\\midrule
+Con IMU & (0.02, $-$0.02, $-$0.04) & ($-$0.06, 0.10, $-$0.18) & 0.136\,m \\
+Sin IMU & (0.02, 0.03, $-$0.04) & (0.02, 0.04, $-$0.06) & 0.005\,m \\\bottomrule
+\end{tabular}
+\end{table}
+
+\fig{p2_odom_vs_filtered_imu.png}{Trayectoria de \texttt{/odom} y \texttt{/odom\_filtered} con IMU.}{fig:p2}
+
+%=====================================================================
+\section{P3: Mapeo con SLAM Toolbox}
+Se usó SLAM Toolbox en modo \emph{online async} con resolución de 0.05\,m/celda, con el robot explorando el almacén a baja velocidad. El mapa (\texttt{maps/mi\_mapa.\{yaml,pgm\}}, $2139\times606$ celdas) se muestra en la Fig.~\ref{fig:p3}.
+
+Fue necesario ampliar el rango del lidar de 10 a 25\,m: en los pasillos largos los rayos sin retorno (\emph{inf}) se descartan y el \emph{scan matching} perdía referencias longitudinales. Errores observados en el mapa:
+\begin{itemize}
+  \item un abanico de celdas libres hacia afuera por una puerta abierta, donde el láser no encuentra pared;
+  \item zonas grises sin explorar detrás de las estanterías (sombras del láser);
+  \item bordes con ruido leve por el ruido del láser y obstáculos fuera del plano del láser que no aparecen.
+\end{itemize}
+A mayor velocidad, sobre todo angular, los scans consecutivos se solapan menos y el \emph{scan matching} falla con más facilidad: aparecen paredes duplicadas y giros mal estimados. Explorar a $\approx0.2$\,m/s y $\le0.5$\,rad/s produjo un mapa consistente.
+
+\fig{p3_mapa.png}{Mapa del almacén obtenido con SLAM Toolbox (0.05\,m/celda).}{fig:p3}
+
+%=====================================================================
+\section{P4: Localización con AMCL}
+AMCL usa entre 500 y 2000 partículas, modelo de láser \emph{likelihood field} ($\sigma_{hit}=0.2$\,m) y modelo de movimiento diferencial ($\alpha_{1..4}=0.2$). Con la pose inicial correcta, la nube inicial se contrae al mover el robot (Fig.~\ref{fig:p4a}), aunque queda alargada a lo largo del pasillo por la ambigüedad longitudinal.
+
+\fig{p4_convergencia_2_despues.png}{Nube de partículas de AMCL tras mover el robot.}{fig:p4a}
+
+\textbf{Pose inicial incorrecta.} Con una pose desplazada 2\,m y 0.6\,rad, el scan queda desalineado con el mapa (Fig.~\ref{fig:p4b}). Al avanzar, las paredes laterales corrigen rápido el error lateral y de yaw, pero el error longitudinal persiste en el pasillo. Como \texttt{recovery\_alpha\_slow/fast}$=0$, no hay reinyección de partículas aleatorias; un error grande se corrige con \emph{2D Pose Estimate} o con \texttt{/reinitialize\_global\_localization}.
+
+\textbf{Ruido del láser.} Más ruido hace que cada scan encaje peor con el mapa y los pesos de las partículas se igualan: la nube converge más lento, queda más dispersa y la pose estimada oscila. Si el ruido real supera lo modelado por $\sigma_{hit}$, la localización se degrada.
+
+\fig{p4_pose_incorrecta_tras_mover.png}{AMCL con pose inicial incorrecta, tras mover el robot.}{fig:p4b}
+
+%=====================================================================
+\section{P5: Navegación con Nav2}
+La configuración parte de los parámetros por defecto de Jazzy, adaptados a \texttt{base\_link}, radio de 0.30\,m, láser de 25\,m y odometría \texttt{/odom\_filtered} (Tabla~\ref{tab:nav2}).
+
+\begin{table}[!t]\centering\footnotesize
+\caption{Configuración de Nav2}\label{tab:nav2}
+\begin{tabularx}{\columnwidth}{lX}\toprule
+Componente & Plugin \\\midrule
+Planner & \texttt{nav2\_navfn\_planner::NavfnPlanner} \\
+Controller & \texttt{nav2\_mppi\_controller::MPPIController} \\
+Smoother & \texttt{nav2\_smoother::SimpleSmoother} \\
+Behaviors & spin, backup, drive\_on\_heading, wait \\
+BT & \texttt{navigate\_to\_pose\_w\_} \texttt{replanning\_and\_recovery} \\\bottomrule
+\end{tabularx}
+\end{table}
+
+El planner por defecto es NavFn (Dijkstra, \texttt{use\_astar: false}) sobre el costmap global, replanificando a 1\,Hz; la ruta la sigue MPPI. La recuperación tiene dos niveles: primero se limpia el costmap del planner o controller que falló y se reintenta; si persiste, un \texttt{RoundRobin} global (hasta 6 reintentos) alterna entre limpiar costmaps, \emph{Spin} (1.57\,rad), \emph{Wait} (5\,s) y \emph{BackUp} (0.30\,m). Con una meta a 12\,m (Figs.~\ref{fig:p5a} y \ref{fig:p5b}) el robot llegó en 28\,s simulados sin recuperaciones (\texttt{SUCCEEDED}). Una meta fuera del mapa fue rechazada de inmediato por el planner (\texttt{FAILED}, 0 recuperaciones), porque el BT no recupera metas fuera de los límites del costmap; para ver \emph{Spin}/\emph{BackUp} hay que bloquear la ruta con un obstáculo.
+
+\fig{p5_metas_rviz_1_trayecto.png}{Nav2 siguiendo la ruta planificada hacia una meta.}{fig:p5a}
+\fig{p5_metas_rviz_2_llegada.png}{Meta alcanzada (\emph{Feedback: reached}).}{fig:p5b}
+
+%=====================================================================
+\section{Misión autónoma}
+El nodo \texttt{scripts/mision.py} lee los waypoints de \texttt{config/waypoints.yaml}, expone \texttt{/iniciar\_mision} y \texttt{/cancelar\_mision} (\texttt{std\_srvs/Trigger}) y publica el progreso en \texttt{/estado\_mision}. Usa \texttt{BasicNavigator}: fija la pose inicial de AMCL, espera a que Nav2 esté activo y envía cada waypoint con \texttt{goToPose}, registrando éxito o fallo. La misión corre en un hilo propio; la cancelación solo activa una bandera y el lazo de la misión llama a \texttt{cancelTask}.
+
+\begin{lstlisting}[language=bash]
+ros2 launch dif_bot mision.launch.py
+ros2 service call /iniciar_mision std_srvs/srv/Trigger
+ros2 topic echo /estado_mision
+\end{lstlisting}
+
+Los waypoints (Fig.~\ref{fig:mision}) se eligieron sobre el mapa real, con 0.7\,m de holgura a los obstáculos, recorriendo tres extremos del almacén y volviendo al inicio: P1 $(11.9,-0.8)$, P2 $(-1.9,11.9)$, P3 $(-1.9,-8.7)$ e inicio $(0,0)$.
+
+\fig{mision_waypoints.png}{Waypoints de la misión sobre el mapa.}{fig:mision}
+
+%=====================================================================
+\section{Conclusiones}
+\begin{itemize}
+  \item \texttt{ros2\_control} es la opción para hardware real; el plugin de Gazebo es más simple para prototipar. Ambos publican odometría a 50\,Hz con latencia despreciable.
+  \item El beneficio del EKF depende de las covarianzas y del entorno: sin deslizamiento la IMU no mejora la estimación, pero en un robot real compensa el patinaje.
+  \item La calidad del mapa SLAM depende de la velocidad de exploración y del rango del láser en espacios amplios.
+  \item AMCL converge rápido con una pose inicial aproximada, pero sin reinyección de partículas no se recupera de errores grandes y conserva ambigüedad en pasillos.
+  \item Nav2 con su BT de recuperación y \texttt{nav2\_simple\_commander} permiten construir misiones autónomas robustas con poco código.
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{ros2} Open Robotics, ``ROS 2 Documentation: Jazzy,'' \url{https://docs.ros.org/en/jazzy/}.
+\bibitem{ros2control} ros2\_control Development Team, ``ros2\_control,'' \url{https://control.ros.org}.
+\bibitem{rl} T. Moore and D. Stouch, ``A generalized extended Kalman filter implementation for the Robot Operating System,'' in \emph{Proc. IAS-13}, 2014.
+\bibitem{slam} S. Macenski and I. Jambrecic, ``SLAM Toolbox: SLAM for the dynamic world,'' \emph{J. Open Source Softw.}, vol.~6, no.~61, 2021.
+\bibitem{nav2} S. Macenski, F. Martín, R. White, and J. Ginés, ``The Marathon 2: A navigation system,'' in \emph{Proc. IEEE/RSJ IROS}, 2020.
+\bibitem{amcl} S. Thrun, W. Burgard, and D. Fox, \emph{Probabilistic Robotics}. MIT Press, 2005.
+\end{thebibliography}
+
+\end{document}

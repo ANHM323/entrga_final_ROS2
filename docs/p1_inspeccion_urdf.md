@@ -18,7 +18,7 @@
 | Sensor | Tipo Gazebo | Tópico ROS | Frecuencia | Frame |
 |---|---|---|---|---|
 | IMU | `imu` | `/imu` | 50 Hz | imu_link |
-| Lidar 2D | `gpu_lidar` 360 muestras, 0.12–10 m | `/scan` | 10 Hz | lidar_link |
+| Lidar 2D | `gpu_lidar` 360 muestras, 0.12–25 m | `/scan` | 10 Hz | lidar_link |
 | Cámara de profundidad | `depth_camera` 320×240 | (no puenteada) | 15 Hz | camera_depth_frame |
 
 ## Parámetros cinemáticos
