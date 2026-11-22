@@ -90,7 +90,8 @@ ros2 topic echo /estado_mision
 ```
 Los waypoints están en `config/waypoints.yaml` (frame `map`). Ajústalos a tu mapa con *Publish Point* en RViz (`ros2 topic echo /clicked_point`).
 
-### Colaboración con Claude para la administración del repositorio
+
+## Colaboración con Claude para la administración del repositorio
 
 ## Informe
 `informe/informe.pdf` (formato IEEE, fuente `informe/informe.tex`). Para recompilar:
